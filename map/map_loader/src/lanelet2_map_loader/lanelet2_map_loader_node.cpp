@@ -80,6 +80,9 @@ void Lanelet2MapLoaderNode::on_map_projector_info(
 
   // overwrite centerline
   lanelet::utils::overwriteLaneletsCenterline(map, center_line_resolution, false);
+  
+  // add bidirectional lanelets
+  lanelet::utils::addBidirectionalLanelets(map);
 
   // create map bin msg
   const auto map_bin_msg = create_map_bin_msg(map, lanelet2_filename, now());
