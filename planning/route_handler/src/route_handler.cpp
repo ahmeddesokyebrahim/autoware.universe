@@ -1983,7 +1983,13 @@ bool RouteHandler::planPathLaneletsBetweenCheckpoints(
 
   lanelet::Optional<lanelet::routing::Route> optional_route;
   std::vector<lanelet::ConstLanelets> candidate_paths;
+  lanelet::routing::LaneletPath shortest_path;
   bool is_route_found = false;
+
+  bool shortest_path_has_no_drivable_lane = hasNoDrivableLaneInPath(shortest_path);
+  lanelet::routing::LaneletPath drivable_lane_path;
+  bool drivable_lane_path_found = false;
+
   for (const auto & start_lanelet : start_lanelets) {
     optional_route = routing_graph_ptr_->getRoute(start_lanelet, goal_lanelet, 0);
     if (!optional_route) {
@@ -1997,29 +2003,37 @@ bool RouteHandler::planPathLaneletsBetweenCheckpoints(
     } else {
       is_route_found = true;
 
-  const lanelet::routing::LaneletPath shortest_path = optional_route->shortestPath();
-  bool shortest_path_has_no_drivable_lane = hasNoDrivableLaneInPath(shortest_path);
-  lanelet::routing::LaneletPath drivable_lane_path;
-  bool drivable_lane_path_found = false;
+      shortest_path = optional_route->shortestPath();
+      lanelet::ConstLanelets candidate_path_lanelets;
+      for (const auto & llt : shortest_path) {
+        candidate_path_lanelets.push_back(llt);
+      }
+      candidate_paths.push_back(candidate_path_lanelets);
+      if (shortest_path_has_no_drivable_lane) {
+        drivable_lane_path_found =
+          findDrivableLanePath(start_lanelet, goal_lanelet, drivable_lane_path);
+      }
+      lanelet::routing::LaneletPath path;
+      if (drivable_lane_path_found) {
+        path = drivable_lane_path;
+      } else {
+        path = shortest_path;
+      }
 
-  if (shortest_path_has_no_drivable_lane) {
-    drivable_lane_path_found =
-      findDrivableLanePath(start_lanelet, goal_lanelet, drivable_lane_path);
+      path_lanelets->reserve(path.size());
+      for (const auto & llt : path) {
+        path_lanelets->push_back(llt);
+      }
+    }
   }
-
-  lanelet::routing::LaneletPath path;
-  if (drivable_lane_path_found) {
-    path = drivable_lane_path;
-  } else {
-    path = shortest_path;
+  size_t shortest_path_length = std::numeric_limits<int>::max();
+  for (const auto & candidate_path : candidate_paths) {
+    if (candidate_path.size() < shortest_path_length) {
+      shortest_path_length = candidate_path.size();
+      *path_lanelets = candidate_path;
+    }
   }
-
-  path_lanelets->reserve(path.size());
-  for (const auto & llt : path) {
-    path_lanelets->push_back(llt);
-  }
-
-  return true;
+  return is_route_found;
 }
 
 std::vector<LaneletSegment> RouteHandler::createMapSegments(
@@ -2075,7 +2089,7 @@ bool RouteHandler::hasNoDrivableLaneInPath(const lanelet::routing::LaneletPath &
 }
 
 bool RouteHandler::findDrivableLanePath(
-  const lanelet::Lanelet & start_lanelet, const lanelet::Lanelet & goal_lanelet,
+  const lanelet::ConstLanelet & start_lanelet, const lanelet::Lanelet & goal_lanelet,
   lanelet::routing::LaneletPath & drivable_lane_path) const
 {
   double drivable_lane_path_length2d = std::numeric_limits<double>::max();
