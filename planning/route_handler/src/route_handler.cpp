@@ -2006,27 +2006,31 @@ bool RouteHandler::planPathLaneletsBetweenCheckpoints(
 
       
       if(optional_route->length2d() < shortest_path_length2d){
+        shortest_path_length2d = optional_route->length2d();
         shortest_path = optional_route->shortestPath();
         start_lanelet = st_llt;
       }
-
-      lanelet::routing::LaneletPath path;
-      if (drivable_lane_path_found) {
-        path = drivable_lane_path;
-      } else {
-        path = shortest_path;
-      }
-
-      path_lanelets->reserve(path.size());
-      for (const auto & llt : path) {
-        path_lanelets->push_back(llt);
-      }
     }
   }
-  bool shortest_path_has_no_drivable_lane = hasNoDrivableLaneInPath(shortest_path);
-  if (shortest_path_has_no_drivable_lane) {
-    drivable_lane_path_found =
-      findDrivableLanePath(start_lanelet, goal_lanelet, drivable_lane_path);
+
+  if (is_route_found) {
+    bool shortest_path_has_no_drivable_lane = hasNoDrivableLaneInPath(shortest_path);
+    if (shortest_path_has_no_drivable_lane) {
+      drivable_lane_path_found =
+        findDrivableLanePath(start_lanelet, goal_lanelet, drivable_lane_path);
+    }
+
+    lanelet::routing::LaneletPath path;
+    if (drivable_lane_path_found) {
+      path = drivable_lane_path;
+    } else {
+      path = shortest_path;
+    }
+
+    path_lanelets->reserve(path.size());
+    for (const auto & llt : path) {
+      path_lanelets->push_back(llt);
+    }
   }
 
   return is_route_found;
